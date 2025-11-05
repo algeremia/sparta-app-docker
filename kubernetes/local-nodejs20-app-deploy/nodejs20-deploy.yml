@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nodejs20-deployment
+  labels:
+    app: nodejs20
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: nodejs20
+  template:
+    metadata:
+      labels:
+        app: nodejs20
+    spec:
+      containers:
+      - name: nodejs20
+        image: screamingtuna/sparta-node20:v1
+        ports:
+        - containerPort: 80
+        env:
+        - name: DB_HOST
+          value: "mongodb://mongo-svc:27017/posts"
+
