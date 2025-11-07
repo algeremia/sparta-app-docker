@@ -27,6 +27,18 @@
   - [Task: Increase replicas with no downtime](#task-increase-replicas-with-no-downtime)
   - [Task: Delete K8s deployments and services](#task-delete-k8s-deployments-and-services)
   - [Task: K8s deployment of NodeJS Sparta test app](#task-k8s-deployment-of-nodejs-sparta-test-app)
+  - [Task: Create 2-tier deployment with PV for database](#task-create-2-tier-deployment-with-pv-for-database)
+  - [Types of Kubernetes Autoscaling:](#types-of-kubernetes-autoscaling)
+    - [Horizontal Pod Autoscaler (HPA)](#horizontal-pod-autoscaler-hpa)
+    - [Vertical Pod Autoscaler (VPA)](#vertical-pod-autoscaler-vpa)
+    - [In-Place Vertical Scaling (Beta in v1.33+)](#in-place-vertical-scaling-beta-in-v133)
+    - [Cluster Proportional Autoscaler (CPA)](#cluster-proportional-autoscaler-cpa)
+    - [Event-Driven Autoscaling (KEDA)](#event-driven-autoscaling-keda)
+    - [Scheduled Autoscaling (via KEDA Cron Scaler)](#scheduled-autoscaling-via-keda-cron-scaler)
+    - [Node Autoscaling](#node-autoscaling)
+  - [Using Autoscaling for k8s cluster](#using-autoscaling-for-k8s-cluster)
+  - [Task: Deploy on three apps on one cloud instance running minikube](#task-deploy-on-three-apps-on-one-cloud-instance-running-minikube)
+  - [LoadBalancer on Port 9000 (NodePort 30002)](#loadbalancer-on-port-9000-nodeport-30002)
 
 ---
 
@@ -365,7 +377,7 @@ kubectl get pods
 kubectl apply -f nodejs20-service.yml
 kubectl apply -f nodejs20-deploy.yml
 ```
-- [working sparta app on local host node 30003](image.png)
+- [working sparta app on local host node 30003](images/image-10.png)
 
 - then to add mongodb, made two new files, mongo deploy (with mongo 7.0) and mongo service
 - made sure for mongodb file to add `args: ["--bind_ip_all"]`
@@ -383,9 +395,140 @@ kubectl apply -f mongo-deploy.yml
 kubectl apply -f mongo-service.yml
 kubectl apply -f nodejs20-deploy.yml
 ```
-- ![alt text](image-1.png)
+- ![alt text](images/image-11.png)
 - useful commands I used for debugging:
 ```bash
 kubectl get all
 kubectl delete all --all
 ```
+
+## Task: Create 2-tier deployment with PV for database 
+- Made two new files mongo-pv.yml and mongo-pvc.yml
+- 
+```bash
+kubectl apply -f mongo-pv.yml
+kubectl apply -f mongo-pvc.yml
+kubectl apply -f mongo-deploy.yml
+kubectl apply -f nodejs20-deploy.yml
+```
+
+- ![alt text](images/image-12.png) 
+- checking /posts page:
+- ![alt text](images/image-13.png)
+- deleted the mongo pod for a new one to appear:
+- ![alt text](images/image-14.png)
+- Checked posts page again
+- ![alt text](images/image-15.png)
+- same values
+
+## Types of Kubernetes Autoscaling:
+
+**Kubernetes offers multiple autoscaling strategies—horizontal, vertical, event-driven, and cluster-based—each tailored to different workload and infrastructure needs.**
+
+### Horizontal Pod Autoscaler (HPA)
+- **Purpose**: Automatically adjusts the number of pod replicas based on observed metrics like CPU or memory usage.
+- **Implementation**: Built-in Kubernetes API resource and controller.
+- **Use Case**: Ideal for stateless applications where scaling out improves performance.
+- **Example**: Scaling a web server deployment from 3 to 10 replicas during peak traffic.
+
+
+### Vertical Pod Autoscaler (VPA)
+- **Purpose**: Adjusts CPU and memory resource requests for pods.
+- **Modes**:
+  - **Auto**: Evicts and recreates pods with updated resources.
+  - **Recreate**: Similar to Auto; evicts pods when resource changes are needed.
+  - **Initial**: Sets resources only at pod creation.
+  - **Off**: No automatic changes; recommendations are available for inspection.
+- **Requirements**: Must install separately; requires Metrics Server.
+- **Use Case**: Suitable for workloads with consistent pod counts but variable resource needs.
+
+
+### In-Place Vertical Scaling (Beta in v1.33+)
+- **Purpose**: Resize container resources without evicting pods.
+- **Status**: Beta feature; not yet supported by VPA but manual resizing is possible.
+- **Use Case**: Reduces disruption for stateful or long-running pods.
+
+
+### Cluster Proportional Autoscaler (CPA)
+- **Purpose**: Scales workloads based on cluster size (nodes or cores).
+- **Variants**:
+  - **CPA**: Adjusts replica count.
+  - **Cluster Proportional Vertical Autoscaler**: Adjusts resource requests.
+- **Use Case**: Useful for system components like DNS that scale with cluster size.
+
+
+### Event-Driven Autoscaling (KEDA)
+- **Purpose**: Scales workloads based on external event sources (e.g., queue length).
+- **Features**: Supports many event sources via adapters.
+- **Use Case**: Ideal for microservices processing asynchronous workloads.
+
+
+### Scheduled Autoscaling (via KEDA Cron Scaler)
+- **Purpose**: Scales workloads based on time schedules.
+- **Use Case**: Optimize resource usage during predictable traffic patterns (e.g., scale down at night).
+
+
+### Node Autoscaling
+- **Purpose**: Adds or removes nodes to/from the cluster.
+- **Use Case**: Ensures sufficient infrastructure to support workload scaling.
+
+## Using Autoscaling for k8s cluster
+- changed replicas on app deploy yaml to 2
+- added the following lines:
+```yaml
+        resources:
+            requests:
+              cpu: "100m"
+            limits:
+              cpu: "500m"
+```
+- then installed the cpu monitor pod via `kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml`
+```bash
+kubectl autoscale deployment nodejs20-deployment 
+  --cpu=50% 
+  --min=2 
+  --max=10
+```
+- stress tested with
+```bash
+docker run --rm jordi/ab -n 1000 -c 50 http://localhost:30003/posts
+```
+kubectl run ab --rm -i --tty --image=jordi/ab -- \
+  -n 1000 -c 50 http://nodejs20-svc.default.svc.cluster.local:3000/posts
+
+## Task: Deploy on three apps on one cloud instance running minikube 
+- made new EC2 instance with following specs:
+  - t3a small
+  - Ubuntu LT22.04
+- Security group rules:
+- ![alt text](images/image-16.png)
+- Installed docker, k8s and minikube on the machine
+```bash
+sudo apt-get install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+sudo install minikube-linux-amd64 /usr/local/bin/minikube
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+```
+- installed nginx
+- changed the nginx sites available file to become proxy for minikube
+- ![alt text](image.png)
+- ran the following commands
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+minikube start --driver=docker
+```
+> needed to do previous two lines because when I tried to run line 3 initially, would get error:
+```
+X Exiting due to PROVIDER_DOCKER_NEWGRP: "docker version --format <no value>-<no value>:<no value>" exit status 1: permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.51/version": dial unix /var/run/docker.sock: connect: permission denied
+```
+- made yaml setup files as found in 
+- ![alt text](image-1.png)
+
+## LoadBalancer on Port 9000 (NodePort 30002)
