@@ -38,7 +38,8 @@
     - [Node Autoscaling](#node-autoscaling)
   - [Using Autoscaling for k8s cluster](#using-autoscaling-for-k8s-cluster)
   - [Task: Deploy on three apps on one cloud instance running minikube](#task-deploy-on-three-apps-on-one-cloud-instance-running-minikube)
-  - [LoadBalancer on Port 9000 (NodePort 30002)](#loadbalancer-on-port-9000-nodeport-30002)
+  - [App 2: LoadBalancer Service (Port 9000, NodePort 30002)](#app-2-loadbalancer-service-port-9000-nodeport-30002)
+    - [Errors](#errors)
 
 ---
 
@@ -523,6 +524,7 @@ sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 sudo usermod -aG docker $USER
 newgrp docker
 minikube start --driver=docker
+docker login
 ```
 > needed to do previous two lines because when I tried to run line 3 initially, would get error:
 ```
@@ -531,4 +533,63 @@ X Exiting due to PROVIDER_DOCKER_NEWGRP: "docker version --format <no value>-<no
 - made yaml setup files as found in 
 - ![alt text](image-1.png)
 
-## LoadBalancer on Port 9000 (NodePort 30002)
+## App 2: LoadBalancer Service (Port 9000, NodePort 30002)
+- made new yaml files for load balancer
+- in nginx default file, made a new server block and added:
+```
+```
+
+### Errors
+- when accessing through public IP, worked fine for normal nginx page:
+- ![alt text](image-2.png)
+- but when accessing port 9000:
+- ![alt text](image-3.png)
+- `minikube tunnel` engages terminal so tried running `nohup sudo minikube tunnel > tunnel.log 2>&1 &`
+- checked that the pods were running on the EC2 instance:
+```
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ kubectl describe svc tech201-service
+Name:                     tech201-service
+Namespace:                default
+Labels:                   <none>
+Annotations:              <none>
+Selector:                 app=tech201
+Type:                     LoadBalancer
+IP Family Policy:         SingleStack
+IP Families:              IPv4
+IP:                       10.100.88.134
+IPs:                      10.100.88.134
+LoadBalancer Ingress:     10.100.88.134 (VIP)
+Port:                     <unset>  9000/TCP
+TargetPort:               80/TCP
+NodePort:                 <unset>  30002/TCP
+Endpoints:                10.244.0.7:80,10.244.0.6:80
+Session Affinity:         None
+External Traffic Policy:  Cluster
+Internal Traffic Policy:  Cluster
+Events:                   <none>
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ sudo nano /etc/nginx/sites-available/default
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ sudo systemctl restart nginx
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ kubectl get pods -l app=tech201        NAME                             READY   STATUS    RESTARTS       AGE
+tech201-nginx-67ccc477cf-7dvcx   1/1     Running   1 (151m ago)   3h8m
+tech201-nginx-67ccc477cf-r6ncb   1/1     Running   1 (151m ago)   3h8m
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ sudo nginx -t
+sudo systemctl reload nginx
+nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
+nginx: configuration file /etc/nginx/nginx.conf test is successful
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ kubectl get pods -l app=tech201
+NAME                             READY   STATUS    RESTARTS       AGE
+tech201-nginx-67ccc477cf-7dvcx   1/1     Running   1 (152m ago)   3h8m
+tech201-nginx-67ccc477cf-r6ncb   1/1     Running   1 (152m ago)   3h8m
+ubuntu@ip-172-31-58-77:~/2-minikube-app$ curl http://10.100.88.134:9000
+<html>
+    <head>
+        <title>Welcome to Ramon's wonderland</title>
+    </head>
+    <body>
+        <h1>Welcome to Ramon's wonderland</h1>
+        <h3>Coming here was the best decision of your life.</h3>
+    </body>
+```
+- which mean sthat it was fine, might be the tunnel or exposing it is wrong?
+- checking nginx file if that's what's wrong
+- 
