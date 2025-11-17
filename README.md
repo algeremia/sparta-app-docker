@@ -261,7 +261,7 @@ docker rm -f sparta-test
 docker rmi screamingtuna/sparta-node20:v1
 docker run --name sparta-test -p 3000:3000 -d screamingtuna/sparta-node20:v1
 ```
-- ![alt text](image.png)
+- ![alt text](images/test.png)
 ---
 
 ## Docker Compose
@@ -382,10 +382,10 @@ docker compose images
 ## Task: Use Docker Compose to run app and database containers 
 - made a YAML file for docker compose
 - ran `docker compose up-d`
-- ![alt text](image-1.png)
+- ![alt text](images/image-11.png)
 - did not get posts though - fix: amended mongodb line
-- ![alt text](image-2.png)
+- ![alt text](images/image-12.png)
 - needed to reseed database
 - used `docker exec -it app node seeds/seed.js`
-- ![alt text](image-3.png)
+- ![alt text](images/image-13.png)
 docker exec -it mongo cat /etc/mongod.conf 
