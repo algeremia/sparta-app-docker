@@ -40,6 +40,7 @@
   - [Task: Deploy on three apps on one cloud instance running minikube](#task-deploy-on-three-apps-on-one-cloud-instance-running-minikube)
   - [App 2: LoadBalancer Service (Port 9000, NodePort 30002)](#app-2-loadbalancer-service-port-9000-nodeport-30002)
     - [Errors](#errors)
+  - [](#)
 
 ---
 
@@ -509,6 +510,13 @@ sudo apt-get install ca-certificates curl
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Add the repository to Apt sources:
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt-get update
+
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 
 curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
@@ -530,13 +538,14 @@ docker login
 ```
 X Exiting due to PROVIDER_DOCKER_NEWGRP: "docker version --format <no value>-<no value>:<no value>" exit status 1: permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.51/version": dial unix /var/run/docker.sock: connect: permission denied
 ```
-- made yaml setup files as found in 
+- made yaml setup files as found in [folder](minikube-cloud)
 - ![alt text](image-1.png)
 
 ## App 2: LoadBalancer Service (Port 9000, NodePort 30002)
 - made new yaml files for load balancer
 - in nginx default file, made a new server block and added:
 ```
+
 ```
 
 ### Errors
@@ -592,4 +601,35 @@ ubuntu@ip-172-31-58-77:~/2-minikube-app$ curl http://10.100.88.134:9000
 ```
 - which mean sthat it was fine, might be the tunnel or exposing it is wrong?
 - checking nginx file if that's what's wrong
+  - no it's to do with actually exposing the port with a load balancer
+  - in nginx files replaced server block with:
+```
+server {
+    listen 9000;
+    server_name _;
+
+    location / {
+        proxy_pass http://10.99.98.197:9000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+- this also didn't work, trying
+```
+server {
+    listen 9000;
+
+    location / {
+        proxy_pass http://10.107.76.59:9000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+
+```
+- ![alt text](image-4.png)
 - 
+
+## 
